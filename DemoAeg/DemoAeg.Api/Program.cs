@@ -1,5 +1,7 @@
 using Azure.Messaging.EventGrid;
 using Azure.Messaging.EventGrid.SystemEvents;
+using Microsoft.AspNetCore.ResponseCompression;
+using Microsoft.AspNetCore.SignalR;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -12,7 +14,15 @@ builder.Services
     .AddEndpointsApiExplorer()
     .AddSwaggerGen();
 
+builder.Services.AddSignalR();
+builder.Services.AddResponseCompression(opts =>
+{
+    opts.MimeTypes = ResponseCompressionDefaults.MimeTypes.Concat(new[] { "application/octet-stream" });
+});
+
 var app = builder.Build();
+
+app.UseResponseCompression();
 
 if (app.Environment.IsDevelopment())
 {
@@ -103,6 +113,8 @@ app.MapPost("/webhook/", (EventGridEvent[] events, HttpRequest request, ILogger<
 })
 .WithOpenApi();
 
+app.MapHub<EventHub>("/eventhub");
+
 app.Run();
 
 class TelephonieEventData
@@ -110,4 +122,13 @@ class TelephonieEventData
     public string AgentLogin { get; set; }
     public string CustNumber { get; set; }
     public string WaitDuration { get; set; }
+}
+
+public class EventHub : Hub
+{
+    public async Task SendEvent(string toAgentLogin, string eventName, string telephone, int wait, string callerName)
+    {
+        //Envoi ciblé au seul destinataire
+        await Clients.User(toAgentLogin).SendAsync(eventName, telephone, wait, callerName);
+    }
 }
