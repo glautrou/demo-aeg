@@ -17,9 +17,14 @@
 }
 else if (IsConnected)
 {
-    <p>Bonjour @agentLogin <button @onclick="Disconnect">Se déconnecter</button></p>
+    <div class="form-group">
+        <label>
+            Bonjour @agentLogin
+        </label>
+    </div>
+    <button @onclick="Disconnect">Se déconnecter</button>
+    <hr />
     <h2>Liste des évènements</h2>
-    <hr>
     <ul id="messagesList">
         @foreach (var eventItem in events)
         {
@@ -49,7 +54,7 @@ else
             .WithUrl($"https://localhost:7230/eventhub?agentLogin={agentLogin}")
             .Build();
 
-        hubConnection.On<string, int, string>(EVENTTYPE_TELEPHONIE_DECROCHER, (telephone, wait, callerName) =>
+        hubConnection.On<string, string, string>(EVENTTYPE_TELEPHONIE_DECROCHER, (telephone, wait, callerName) =>
         {
             var encodedMsg = $"Appel entrant de {callerName} ({telephone}), attente = {wait}";
             events.Add(encodedMsg);
@@ -58,6 +63,7 @@ else
 
         await hubConnection.StartAsync();
 
+        events.Clear();
         isConnected = true;
         StateHasChanged();
     }

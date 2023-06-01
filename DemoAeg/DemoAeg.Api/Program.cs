@@ -20,6 +20,20 @@ builder.Services.AddResponseCompression(opts =>
     opts.MimeTypes = ResponseCompressionDefaults.MimeTypes.Concat(new[] { "application/octet-stream" });
 });
 
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("SignalRClientPolicy", policy =>
+    {
+        policy.AllowAnyHeader()
+            .AllowAnyMethod()
+            .WithOrigins("https://localhost:7230", "https://localhost:7287")
+            .AllowCredentials();
+    });
+});
+
+builder.Services.AddSingleton<EventHub>();
+builder.Services.AddSingleton<IUserIdProvider, MyDemoAegIdProvider>();
+
 var app = builder.Build();
 
 app.UseResponseCompression();
@@ -32,13 +46,15 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
+app.UseCors("SignalRClientPolicy");
+
 const string HEADER_SUBSCRIPTION_NAME = "aeg-subscription-name";
 const string SUBSCRIPTION_VALUE = "egt-demo-aeg-es-api";
 const string HEADER_SECRET = "demo-aeg-secret";
 const string SECRET_VALUE = "123456";
 const string EVENTTYPE_TELEPHONIE_DECROCHER = "Demo.Telephonie.Decrocher";
 
-app.MapPost("/webhook/", (EventGridEvent[] events, HttpRequest request, ILogger<Program> logger) =>
+app.MapPost("/webhook/", async (EventGridEvent[] events, HttpRequest request, ILogger<Program> logger, EventHub eventHub) =>
 {
     #region Log
     var deliveryCount = request.Headers["aeg-delivery-count"].FirstOrDefault() + 1;
@@ -97,7 +113,9 @@ app.MapPost("/webhook/", (EventGridEvent[] events, HttpRequest request, ILogger<
             switch (evt.EventType)
             {
                 case EVENTTYPE_TELEPHONIE_DECROCHER:
-                    logger.LogInformation($"Event={EVENTTYPE_TELEPHONIE_DECROCHER}, Destinataire={eventData.AgentLogin}, Appelant={eventData.CustNumber}");
+                    logger.LogInformation($"Event={evt.EventType}, Destinataire={eventData.AgentLogin}, Appelant={eventData.CustNumber}");
+                    var callerName = "Gilles Lautrou"; //Simulation récupération DB...
+                    await eventHub.SendEventAsync(eventData.AgentLogin, evt.EventType, eventData.CustNumber, eventData.WaitDuration, callerName);
                     return Results.Ok();
                 default:
                     var errorMessage = $"Event custom non géré : {evt.EventType}";
@@ -124,11 +142,59 @@ class TelephonieEventData
     public string WaitDuration { get; set; }
 }
 
-public class EventHub : Hub
+internal class SignalrUser
 {
-    public async Task SendEvent(string toAgentLogin, string eventName, string telephone, int wait, string callerName)
+    public string ConnectionId { get; set; }
+    public string AgentLogin { get; set; }
+}
+
+internal class EventHub : Hub
+{
+    internal static List<SignalrUser> users = new List<SignalrUser>();
+
+    public override Task OnConnectedAsync()
     {
-        //Envoi ciblÃ© au seul destinataire
-        await Clients.User(toAgentLogin).SendAsync(eventName, telephone, wait, callerName);
+        var agentLogin = Context.GetHttpContext().Request.Query["agentLogin"].FirstOrDefault();
+        var connectionID = Context.ConnectionId;
+        users.Add(new SignalrUser
+        {
+            ConnectionId = connectionID,
+            AgentLogin = agentLogin
+        });
+
+        return base.OnConnectedAsync();
+    }
+
+
+    public override Task OnDisconnectedAsync(Exception? exception)
+    {
+        var userToRemove = users.First(i => i.ConnectionId == Context.ConnectionId);
+        users.Remove(userToRemove);
+
+        return base.OnDisconnectedAsync(exception);
+    }
+
+    public async Task SendEventAsync(string toAgentLogin, string eventName, string telephone, string wait, string callerName)
+    {
+        //Envoi ciblé au seul destinataire
+        var toConnectionId = users.FirstOrDefault(i => i.AgentLogin == toAgentLogin)?.ConnectionId;
+        if (toConnectionId != null)
+        {
+            await Clients.User(toConnectionId).SendAsync(eventName, telephone, wait, callerName);
+        }
+        else
+        {
+            //Agent non-connecté, ignoré
+        }
+    }
+}
+
+
+internal class MyDemoAegIdProvider : IUserIdProvider
+{
+    //Par défaut SignalR utilise JWT/cookies, la démo étant simpliste nous simulons un utilisateur connecté
+    public string? GetUserId(HubConnectionContext connection)
+    {
+        return connection.ConnectionId;
     }
 }
