@@ -2,14 +2,15 @@ using Microsoft.Azure.EventGrid.Models;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
-// Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
-builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+builder.Logging.ClearProviders();
+builder.Logging.AddConsole();
+
+builder.Services
+    .AddEndpointsApiExplorer()
+    .AddSwaggerGen();
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -29,7 +30,7 @@ const string SUBSCRIPTION_VALUE = "DEMO-API";
 const string HEADER_SECRET = "demo-secret";
 const string SECRET_VALUE = "123456";
 
-app.MapPost("/webhook/", (EventGridEvent[] events, HttpRequest request, ILogger logger) =>
+app.MapPost("/webhook/", (EventGridEvent[] events, HttpRequest request, ILogger<Program> logger) =>
 {
     //Log
     var deliveryCount = request.Headers["aeg-delivery-count"].FirstOrDefault() + 1;
