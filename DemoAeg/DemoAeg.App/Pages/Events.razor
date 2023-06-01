@@ -5,7 +5,7 @@
 
 <h1>Events</h1>
 
-@if (!isConnected)
+@if (!IsConnected)
 {
     <div class="form-group">
         <label>
@@ -15,7 +15,7 @@
     </div>
     <button @onclick="Connect">Se connecter</button>
 }
-else if (IsConnected)
+else
 {
     <div class="form-group">
         <label>
@@ -32,21 +32,13 @@ else if (IsConnected)
         }
     </ul>
 }
-else
-{
-    <p>Connexion en cours...</p>
-}
 
 @code {
     private const string EVENTTYPE_TELEPHONIE_DECROCHER = "Demo.Telephonie.Decrocher";
-
     private HubConnection? hubConnection;
     private List<string> events = new List<string>();
     private string? agentLogin;
-    private bool isConnected = false;
-
-    public bool IsConnected =>
-        hubConnection?.State == HubConnectionState.Connected;
+    public bool IsConnected => hubConnection?.State == HubConnectionState.Connected;
 
     protected async Task Connect()
     {
@@ -64,7 +56,6 @@ else
         await hubConnection.StartAsync();
 
         events.Clear();
-        isConnected = true;
         StateHasChanged();
     }
 
@@ -73,7 +64,6 @@ else
         if (hubConnection is not null)
         {
             await hubConnection.DisposeAsync();
-            isConnected = false;
         }
     }
 
