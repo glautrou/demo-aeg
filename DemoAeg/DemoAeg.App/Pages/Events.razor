@@ -25,12 +25,15 @@ else
     <button @onclick="Disconnect">Se déconnecter</button>
     <hr />
     <h2>Liste des évènements</h2>
-    <ul id="messagesList">
+    <table id="messagesList">
         @foreach (var eventItem in events)
         {
-            <li>@eventItem</li>
+            <tr>
+                <td><img src="https://i.pravatar.cc/75" /></td>
+                <td>@eventItem</td>
+            </tr>
         }
-    </ul>
+    </table>
 }
 
 @code {
