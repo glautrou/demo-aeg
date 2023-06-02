@@ -114,7 +114,7 @@ app.MapPost("/webhook/", async (EventGridEvent[] events, HttpRequest request, IL
             {
                 case EVENTTYPE_TELEPHONIE_DECROCHER:
                     logger.LogInformation($"Event={evt.EventType}, Destinataire={eventData.AgentLogin}, Appelant={eventData.CustNumber}");
-                    var callerName = "Gilles Lautrou"; //Simulation récupération DB...
+                    var callerName = GetCallerFromDatabase(eventData.CustNumber);
                     await eventHub.SendEventAsync(eventData.AgentLogin, evt.EventType, eventData.CustNumber, eventData.WaitDuration, callerName);
                     return Results.Ok();
                 default:
@@ -134,6 +134,43 @@ app.MapPost("/webhook/", async (EventGridEvent[] events, HttpRequest request, IL
 app.MapHub<EventHub>("/eventhub");
 
 app.Run();
+
+string GetCallerFromDatabase(string telephone)
+{
+    //Simulation recherche base de données
+    var firsts = new[]
+    {
+        "François",
+        "Denis",
+        "Jean",
+        "Pierre",
+        "Denis",
+        "Lucie",
+        "Marie",
+        "Dominique",
+        "Léa",
+        "Ghislène"
+    };
+    var lasts = new[]
+    {
+        "Martin",
+        "Bernard",
+        "Thomas",
+        "Petit",
+        "Robert",
+        "Richard",
+        "Durand",
+        "Dubois",
+        "Moreau",
+        "Laurent"
+    };
+
+    var rnd = new Random();
+    var indexFirst = rnd.Next(0, firsts.Length - 1);
+    var indexLast = rnd.Next(0, lasts.Length - 1);
+
+    return firsts[indexFirst] + " " + lasts[indexLast].ToUpperInvariant();
+}
 
 class TelephonieEventData
 {
